@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
-from os import system, name
+from os import system, name, path, getenv
 import boto3
 from botocore.exceptions import ClientError
 import getpass
 import requests
+from dotenv import load_dotenv
 # from SecureString import clearmem
 
 source_code_url = "https://github.com/navilg/easyawscli"
@@ -32,12 +33,19 @@ def login():
     if region == "":
         exit(0)
 
-    key = str(input("Enter AWS access key >> "))
-    try: 
-        secret = getpass.getpass(prompt='Enter AWS secret (Input text will NOT be visible) >> ')
-    except Exception as error: 
-        print('ERROR', error)
-        exit(1)
+    if path.isfile('.env') and path.getsize('.env') > 0:
+        print(".env file found and is not empty. Reading credentials from the file.")
+        load_dotenv()
+        key = getenv('key')
+        secret = getenv('secret')
+    else:
+        print(".env file not found or is empty.")
+        key = str(input("Enter AWS access key >> "))
+        try: 
+            secret = getpass.getpass(prompt='Enter AWS secret (Input text will NOT be visible) >> ')
+        except Exception as error: 
+            print('ERROR', error)
+            exit(1)
 
     try:
         session = boto3.Session(aws_access_key_id=key, aws_secret_access_key=secret, region_name=region)
@@ -334,15 +342,24 @@ def add_inbound_rule_in_sg(region,session):
     for ip_permission in security_group_details['SecurityGroups'][0]['IpPermissions']:
         i += 1
         current_ip_protocol = ip_permission['IpProtocol']
-        current_ip_ranges = ip_permission['IpRanges']
+        current_ip4_ranges = ip_permission['IpRanges']
+        current_ip6_ranges = ip_permission['Ipv6Ranges']
         current_cidrs = []
         current_description = []
-        for current_ip_range in current_ip_ranges:
-            current_cidrs.append(current_ip_range['CidrIp'])
-            if 'Description' in current_ip_range:
-                current_description.append(current_ip_range['Description'])
+        for current_ip4_range in current_ip4_ranges:
+            current_cidrs.append(current_ip4_range['CidrIp'])
+            if 'Description' in current_ip4_range:
+                current_description.append(current_ip4_range['Description'])
             else:
                 current_description.append('')
+
+        for current_ip6_range in current_ip6_ranges:
+            current_cidrs.append(current_ip6_range['CidrIpv6'])
+            if 'Description' in current_ip6_range:
+                current_description.append(current_ip6_range['Description'])
+            else:
+                current_description.append('')
+        
         current_to_port = ip_permission['ToPort']
         print(str(i) + "\t" + str(current_to_port) + "\t\t" + str(current_ip_protocol) + "\t\t" + str(current_cidrs) + "\t\t\t\t" + str(current_description))
 
